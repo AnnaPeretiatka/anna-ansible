@@ -32,6 +32,12 @@
         state: latest
       when: hostvars[inventory_hostname]['tags']['Version'] | length == 0
 
+    - name: Ensure the service is started and enabled
+      ansible.builtin.service:
+        name: "{{ hostvars[inventory_hostname]['tags']['Service'] }}"
+        state: started
+        enabled: yes
+
     - name: Set parsed time from 'Restart' tag
       ansible.builtin.set_fact:
         restart_day_raw: "{{ hostvars[inventory_hostname]['tags']['Restart'].split(' ')[0] | lower }}"
@@ -84,3 +90,4 @@
         hour: "{{ restart_hour }}"
         minute: "{{ restart_minute }}"
         job: "sudo reboot"
+
