@@ -1,0 +1,86 @@
+- name: AMI template
+  hosts: tag_managed__anna
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Print EC2 tags
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          - Name: {{ hostvars[inventory_hostname]['tags']['Name'] }}
+          - Service: {{ hostvars[inventory_hostname]['tags']['Service'] }}
+          - Version: {{ hostvars[inventory_hostname]['tags']['Version'] | default('latest') }}
+          - Restart: {{ hostvars[inventory_hostname]['tags']['Restart'] }}
+
+    - name: Update hostname based on 'Name' tag
+      ansible.builtin.hostname:
+        name: "{{ hostvars[inventory_hostname]['tags']['Name'] }}"
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install specific version if tag is not empty (downgrade if needed is default of apt)
+      ansible.builtin.apt:
+        name: "{{ hostvars[inventory_hostname]['tags']['Service'] }}={{ hostvars[inventory_hostname]['tags']['Version'] }}"
+        state: present
+      when: hostvars[inventory_hostname]['tags']['Version'] | length > 0
+
+    - name: Install latest version if Version tag is empty
+      ansible.builtin.apt:
+        name: "{{ hostvars[inventory_hostname]['tags']['Service'] }}"
+        state: latest
+      when: hostvars[inventory_hostname]['tags']['Version'] | length == 0
+
+    - name: Set parsed time from 'Restart' tag
+      ansible.builtin.set_fact:
+        restart_day_raw: "{{ hostvars[inventory_hostname]['tags']['Restart'].split(' ')[0] | lower }}"
+        restart_time_raw: "{{ hostvars[inventory_hostname]['tags']['Restart'].split(' ')[2:] | join(' ') | lower }}"
+
+    - name: Map restart_day to cron-compatible format
+      ansible.builtin.set_fact:
+        restart_day: >-
+          {{ {
+            'sunday': 'sun',
+            'monday': 'mon',
+            'tuesday': 'tue',
+            'wednesday': 'wed',
+            'thursday': 'thu',
+            'friday': 'fri',
+            'saturday': 'sat'
+          }[restart_day_raw] }}
+
+    - name: Normalize restart hour and minute
+      ansible.builtin.set_fact:
+        restart_hour: "{{ _hour | int }}"
+        restart_minute: "{{ _minute | int }}"
+      vars:
+        _raw_hour: "{{ restart_time_raw.split(':')[0] | int }}"
+        _raw_minute: >-
+          {% if ':' in restart_time_raw %}
+           {{ restart_time_raw.split(':')[1].split(' ')[0] | int }}
+          {% else %}
+            0
+          {% endif %}
+        _hour: >-
+          {% if 'pm' in restart_time_raw and _raw_hour != 12 %}
+            {{ _raw_hour + 12 }}
+          {% elif 'am' in restart_time_raw and _raw_hour == 12 %}
+            0
+          {% else %}
+            {{ _raw_hour }}
+          {% endif %}
+        _minute: "{{ _raw_minute }}"
+
+
+    - name: Debug parsed cron time
+      ansible.builtin.debug:
+        msg: "Restart set for {{ restart_day }} at {{ restart_hour }}:{{ '%02d' | format(restart_minute | int) }}"
+
+    - name: Create cronjob to restart the server based on 'Restart' tag
+      ansible.builtin.cron:
+        name: "Reboot server"
+        weekday: "{{ restart_day }}"
+        hour: "{{ restart_hour }}"
+        minute: "{{ restart_minute }}"
+        job: "sudo reboot"

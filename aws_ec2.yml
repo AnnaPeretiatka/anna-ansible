@@ -1,0 +1,18 @@
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+hostnames:
+  #- tag:Name
+   - ip-address
+  #- private-ip-address
+keyed_groups:
+  - key: tags.Managed
+    prefix: tag_managed_
+  - key: tags.Name
+    prefix: tag_name_
+  - key: tags.Service
+    prefix: tag_service_
+  - key: tags.Version
+    prefix: tag_version_
+  - key: tags.Restart
+    prefix: tag_restart_
