@@ -1,0 +1,9 @@
+1. Explain in your own non-ChatGPTed words what's the pros of using Ansible as opposed to an AMI template. 
+When using ansible you can insert your instances in all kind of different groups using tags (one instance can be in many groups).
+Once you have your desired group you can configure all of them in one click based on the yaml file.
+If upgrade needed you can always adjust the yaml file an rerun it again on desired hosts. 
+It uses roles, tags, variables in a very dynamic and clear way.
+
+2. Explain in your own non-ChatGPTed words what's the cons of using Ansible as opposed to an AMI template.
+ansible depends a lot on perfect ssh conection but it no always the case, can take time with all the keys and firewalls on the way.
+need to create all the files, take care of the inventory and roles.
